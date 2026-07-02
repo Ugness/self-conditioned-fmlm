@@ -1,0 +1,90 @@
+# ELF-B Lightning config — OWT preprocessed with the GPT-2 BPE tokenizer.
+
+# Dataset
+data_path: "../dataset/openwebtext-gpt2-flm/train"
+eval_data_path: "../dataset/openwebtext-gpt2-flm/valid"
+max_length: 1024
+pad_token: eos
+
+# Encoder
+encoder_model_name: gpt2-large
+encoder_checkpoint: null
+feature_layer: last
+latent_mean: -0.009133760006666183
+latent_std: 0.9250109602467304
+
+# Model architecture
+model: ELF-B
+bottleneck_dim: 128
+num_time_tokens: 4
+num_self_cond_cfg_tokens: 4
+num_model_mode_tokens: 4
+
+# Denoiser objective
+denoiser_p_mean: -1.5
+denoiser_p_std: 0.8
+denoiser_noise_scale: 2.0
+t_eps: 0.05
+time_schedule: "logit_normal"
+
+# Decoder objective
+decoder_prob: 0.2
+decoder_noise_scale: 5.0
+decoder_p_mean: 0.8
+decoder_p_std: 0.8
+
+# Conditioning / CFG
+self_cond_prob: 0.5
+
+# Training
+epochs: 5
+global_batch_size: 512
+blr: 0.001
+weight_decay: 0.0
+warmup_epochs: 0.5
+warmup_steps: -1
+optimizer: muon
+
+# EMA
+ema_decay1: 0.9999
+
+# Sampling
+sampling_configs_path: "configs/sampling_configs/owt_ELF_b.yml"
+num_samples: 1000
+
+# Logging / checkpointing
+log_freq: 100
+save_freq: 1
+eval_freq: 1
+
+# Output
+output_dir: "outputs/elf_b-gpt2"
+resume: null
+
+# Wandb
+use_wandb: true
+wandb_project: sc_fmlm
+wandb_entity: None
+wandb_run_name: elf_b-gpt2
+
+# Misc
+seed: 42
+num_workers: 8
+prefetch_factor: 4
+pin_memory: true
+persistent_workers: true
+
+# Optimization knobs
+use_flash: true
+precision: bf16-mixed
+
+# Per-epoch eval callback
+epoch_eval_num_samples: 256
+epoch_eval_num_sampling_steps: 32
+epoch_eval_sde_gamma: 1.5
+epoch_eval_self_cond_cfg_scale: 3.0
+
+# GPT-2 BPE has BOS == EOS == 50256 (<|endoftext|>); first generated token is the
+# learned BOS. With mask_after_eos=true, that "first EOS" triggers full-row pad
+# masking and gen_ppl becomes NaN. Disable, same as flm_t5.
+mask_after_eos: false

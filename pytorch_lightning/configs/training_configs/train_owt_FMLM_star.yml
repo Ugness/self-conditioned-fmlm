@@ -1,0 +1,118 @@
+# Stage-3 : flow-map distillation with a Stage-2 ELF* TEACHER.
+
+# Dataset
+data_path: "../dataset/openwebtext-gpt2-flm/train"
+eval_data_path: "../dataset/openwebtext-gpt2-flm/valid"
+max_length: 1024
+pad_token: eos
+
+# Encoder — must match the teacher exactly (ELF* teacher used gpt2-large).
+encoder_model_name: gpt2-large
+encoder_checkpoint: null
+feature_layer: last
+latent_mean: -0.009133760006666183
+latent_std: 0.9250109602467304
+
+# Model architecture — must match the ELF* teacher checkpoint.
+model: ELF-B
+bottleneck_dim: 128
+num_time_tokens: 4
+num_self_cond_cfg_tokens: 4
+num_model_mode_tokens: 4
+
+# Denoiser objective (drives the tau -> t reparam in the flow-map sampler).
+# Must match the teacher's training distribution.
+denoiser_p_mean: -1.5
+denoiser_p_std: 0.8
+denoiser_noise_scale: 2.0
+t_eps: 0.05
+time_schedule: "logit_normal"
+
+# Decoder objective (decode CE branch sampled at decoder_prob)
+decoder_prob: 0.1
+decoder_noise_scale: 5.0
+decoder_p_mean: 0.8
+decoder_p_std: 0.8
+
+# Conditioning / CFG — self_cond_prob is the fraction of w>0 diagonal rows
+self_cond_prob: 1.0
+self_cond_cfg_min: 0.5
+self_cond_cfg_max: 5.0
+
+# ---- Flow-map training ----
+elfmap_enabled: true
+elfmap_tau_kind: "logit_normal_uniform"   # probit reparam — matches the n16-scp1.0-probit reference
+diagonal_fraction: 0.5
+boundary_prob: 32
+diag_weight: 1.0
+off_weight: 1.0
+rescale_offdiag_loss_psd: false
+double_time_emb: true
+# ---- ELF* teacher (Stage 3) ----
+elfmap_teacher_is_cdeq: true
+teacher_ckpt_path: outputs/elf_star/last.ckpt
+# Must match the ELF* teacher's phase bank + inference phase (tau_0).
+cdeq_num_phase_tokens: 4
+cdeq_inference_phase: 0.002
+# cdeq_enabled stays false: the STUDENT is a plain two-time flow map (no phase
+# tokens). Only the teacher carries the phase bank.
+
+# SC-free student regime (PLAN_ELFMAP §13). Student feeds zeros into its SC slot.
+elfmap_student_sc_free: true
+elfmap_sc_refine_steps: 1          # unused under elfmap_teacher_is_cdeq (>=1 guard)
+elfmap_scfree_offdiag_mode: free   # free | chained | rerun  (off-diag target SC)
+# The two knobs below are inert when elfmap_student_sc_free=true.
+elfmap_offdiag_b_sc_mode: anchored
+elfmap_student_offdiag_sc_mode: sc_signal
+
+# Training
+epochs: 5
+global_batch_size: 512
+blr: 0.001
+weight_decay: 0.0
+warmup_epochs: 0.5
+warmup_steps: -1
+optimizer: muon
+
+# EMA
+ema_decay1: 0.9999
+
+# Sampling — flow-map sweep
+sampling_configs_path: "configs/sampling_configs/owt_FMLM_star.yml"
+num_samples: 1000
+
+# Logging / checkpointing
+log_freq: 100
+save_freq: 1
+eval_freq: 1
+
+# Output (distinct so checkpoints don't collide with other ELFMap runs)
+output_dir: "outputs/fmlm_star"
+resume: null
+
+# Wandb
+use_wandb: true
+wandb_project: sc_fmlm
+wandb_entity: None
+wandb_run_name: fmlm_star
+
+# Misc
+seed: 42
+num_workers: 8
+prefetch_factor: 4
+pin_memory: true
+persistent_workers: true
+
+# Optimization knobs
+use_flash: true
+precision: bf16-mixed
+
+# Per-epoch eval — flow-map sweep at (n, w)
+epoch_eval_method_kind: flowmap
+epoch_eval_num_samples: 256
+flow_map_num_steps_list: [1, 2, 4, 32]
+flow_map_self_cond_cfg_scales: [1.0, 3.0]
+epoch_eval_step_freq: 10000
+
+# GPT-2 BPE BOS == EOS == 50256 — disable mask_after_eos same as the teacher.
+mask_after_eos: false

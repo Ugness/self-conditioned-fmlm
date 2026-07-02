@@ -1,0 +1,19 @@
+# FMLM* few-step inference: CTM gamma-sampling.
+- sampling_method: ctm
+  num_sampling_steps: [1]
+  cfgs: [1.0]
+  self_cond_cfg_scales: [5.0]
+  time_schedule: logit_normal
+  sde_gamma: 1.0
+- sampling_method: ctm
+  num_sampling_steps: [2]
+  cfgs: [1.0]
+  self_cond_cfg_scales: [5.0]
+  time_schedule: logit_normal
+  sde_gamma: 0.75
+- sampling_method: ctm
+  num_sampling_steps: [4]
+  cfgs: [1.0]
+  self_cond_cfg_scales: [5.0]
+  time_schedule: logit_normal
+  sde_gamma: 1.0

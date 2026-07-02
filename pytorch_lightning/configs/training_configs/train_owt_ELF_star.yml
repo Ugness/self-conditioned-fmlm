@@ -1,0 +1,116 @@
+# CDEQ Stage-2: consistency distillation of the self-conditioning refinement axis.
+
+# Dataset
+data_path: "../dataset/openwebtext-gpt2-flm/train"
+eval_data_path: "../dataset/openwebtext-gpt2-flm/valid"
+max_length: 1024
+pad_token: eos
+
+# Encoder — must match the teacher exactly.
+encoder_model_name: gpt2-large
+encoder_checkpoint: null
+feature_layer: last
+latent_mean: -0.009133760006666183
+latent_std: 0.9250109602467304
+
+# Model architecture
+model: ELF-B
+bottleneck_dim: 128
+num_time_tokens: 4
+num_self_cond_cfg_tokens: 4
+num_model_mode_tokens: 4
+
+# Denoiser objective — must match the teacher's training distribution (drives
+# add_noise for z_t and the logit-normal sampling grid).
+denoiser_p_mean: -1.5
+denoiser_p_std: 0.8
+denoiser_noise_scale: 2.0
+t_eps: 0.05
+time_schedule: "logit_normal"
+
+# Decoder objective — CE branch stays active during distillation (Q-D).
+decoder_prob: 0.1
+decoder_noise_scale: 5.0
+decoder_p_mean: 0.8
+decoder_p_std: 0.8
+
+# Conditioning / CFG — SC slot + w-conditioning are REQUIRED for CDEQ.
+self_cond_prob: 0.5
+self_cond_cfg_min: 0.5
+self_cond_cfg_max: 5.0
+
+# ---- CDEQ Stage-2 ----
+cdeq_enabled: true
+double_time_emb: true                  # required by the FPFlowMap setup we reuse; student passes s=t
+teacher_ckpt_path: outputs/elf_b-gpt2/last.ckpt
+cdeq_num_phase_tokens: 4
+cdeq_tau_eps: 0.002
+cdeq_tau_T: 5.0
+cdeq_rho: 0.3                           # tune so (1 - e^{-rho*K}) ~= 1 (here K=20 -> ~0.9975)
+cdeq_gamma: 1.0                         # LINEAR c_skip (code-faithful)
+cdeq_K: 20
+cdeq_anderson_m: 3
+cdeq_anderson_beta: 0.9
+cdeq_anderson_lam: 1.0e-4
+cdeq_student_beta: 1.0
+cdeq_lambda1: 0.8
+cdeq_loss_metric: mse                  # CDEQ paper+code use MSE for both terms
+cdeq_huber_c: null                      # -> 0.00054*sqrt(D)
+cdeq_p_aug: 0.1
+cdeq_k_min: 1
+cdeq_k_tail: 3
+cdeq_p_coldstart: 0.25                 # train the (0,0,tau_0) pure-network inference point directly (c_out=1). Was 0.0; raised because at k~U{2..K} c_out=e^{-rho*k} masks the core's gradient (mean ~0.11) so the inference path was near-unsupervised.
+cdeq_inference_phase: 0.002
+
+# Training (ELF in-house Muon+AdamW; not the paper's Adam 3e-4)
+epochs: 5
+global_batch_size: 512
+blr: 0.001
+weight_decay: 0.0
+warmup_epochs: 0.5
+warmup_steps: -1
+optimizer: muon
+
+# EMA
+ema_decay1: 0.9999
+
+# Sampling — CDEQ sweep
+sampling_configs_path: "configs/sampling_configs/owt_ELF_star.yml"
+num_samples: 1000
+
+# Logging / checkpointing
+log_freq: 100
+save_freq: 1
+eval_freq: 1
+
+# Output
+output_dir: "outputs/elf_star"
+resume: null
+
+# Wandb
+use_wandb: true
+wandb_project: sc_fmlm
+wandb_entity: None
+wandb_run_name: elf_star
+
+# Misc
+seed: 42
+num_workers: 8
+prefetch_factor: 4
+pin_memory: true
+persistent_workers: true
+
+# Optimization knobs
+use_flash: true
+precision: bf16-mixed
+
+# Per-epoch eval — SDE-grid callback routed to the cdeq sampler (1 fwd/step).
+epoch_eval_method_kind: sde
+epoch_eval_num_samples: 256
+epoch_eval_num_sampling_steps: 32
+epoch_eval_sde_gamma: 1.5
+epoch_eval_self_cond_cfg_scale: 3.0
+epoch_eval_step_freq: 10000
+
+# GPT-2 BPE BOS == EOS == 50256 — disable mask_after_eos (matches the teacher).
+mask_after_eos: false

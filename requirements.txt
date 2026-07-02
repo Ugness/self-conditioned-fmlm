@@ -1,0 +1,14 @@
+torch
+lightning
+transformers>=4.41.2,<4.45.0
+tokenizers>=0.19.0
+sentencepiece>=0.1.99
+datasets>=2.19.0
+huggingface-hub>=0.23.0
+safetensors>=0.4.0
+accelerate>=0.30.0
+einops
+numpy>=1.26.4
+PyYAML>=6.0.1
+tqdm>=4.66.0
+wandb>=0.16.6
